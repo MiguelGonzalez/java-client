@@ -93,6 +93,7 @@ public class AutomaticTransport extends HttpClientTransport {
             @Override
             public void run(Void obj) throws Exception {
                 // set the real transport and trigger end the start future
+                log("Transport started " + currentTransport.getName(), LogLevel.Information);
                 mRealTransport = currentTransport;
                 startFuture.setResult(null);
             }
