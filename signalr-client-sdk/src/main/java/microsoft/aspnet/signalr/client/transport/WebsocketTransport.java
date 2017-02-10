@@ -32,8 +32,8 @@ import microsoft.aspnet.signalr.client.http.HttpConnection;
  */
 public class WebsocketTransport extends HttpClientTransport {
 
-    private String mPrefix;
-    private static final Gson gson = new Gson();
+    private StringBuffer mBuffer = new StringBuffer();
+
     WebSocketClient mWebSocketClient;
     private UpdateableCancellableFuture<Void> mConnectionFuture;
 
@@ -113,28 +113,20 @@ public class WebsocketTransport extends HttpClientTransport {
             @Override
             public void onFragment(Framedata frame) {
                 try {
+                    // read all data as UTF-8
                     String decodedString = Charsetfunctions.stringUtf8(frame.getPayloadData());
 
-                    if(decodedString.equals("]}")){
-                        return;
-                    }
+                    // add string to buffer
+                    mBuffer.append(decodedString);
 
-                    if(decodedString.endsWith(":[") || null == mPrefix){
-                        mPrefix = decodedString;
-                        return;
-                    }
+                    // if this is final frame
+                    if(frame.isFin()) {
+                        String message = mBuffer.toString();
 
-                    String simpleConcatenate = mPrefix + decodedString;
+                        // reset buffer
+                        mBuffer = new StringBuffer();
 
-                    if(isJSONValid(simpleConcatenate)){
-                        onMessage(simpleConcatenate);
-                    }else{
-                        String extendedConcatenate = simpleConcatenate + "]}";
-                        if (isJSONValid(extendedConcatenate)) {
-                            onMessage(extendedConcatenate);
-                        } else {
-                            log("invalid json received:" + decodedString, LogLevel.Critical);
-                        }
+                        onMessage(message);
                     }
                 } catch (InvalidDataException e) {
                     e.printStackTrace();
@@ -159,12 +151,4 @@ public class WebsocketTransport extends HttpClientTransport {
         return new UpdateableCancellableFuture<Void>(null);
     }
 
-    private boolean isJSONValid(String test){
-        try {
-            gson.fromJson(test, Object.class);
-            return true;
-        } catch(com.google.gson.JsonSyntaxException ex) {
-            return false;
-        }
-    }
 }
