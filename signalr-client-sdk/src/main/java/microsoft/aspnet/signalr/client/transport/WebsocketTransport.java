@@ -11,8 +11,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
 
-import com.google.gson.Gson;
-
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.exceptions.InvalidDataException;
 import org.java_websocket.framing.Framedata;
@@ -108,11 +106,13 @@ public class WebsocketTransport extends HttpClientTransport {
             @Override
             public void onError(Exception e) {
                 mWebSocketClient.close();
+                mConnectionFuture.triggerError(e);
             }
 
             @Override
             public void onFragment(Framedata frame) {
                 try {
+
                     // read all data as UTF-8
                     String decodedString = Charsetfunctions.stringUtf8(frame.getPayloadData());
 
@@ -150,5 +150,4 @@ public class WebsocketTransport extends HttpClientTransport {
         mWebSocketClient.send(data);
         return new UpdateableCancellableFuture<Void>(null);
     }
-
 }
