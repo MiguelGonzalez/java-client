@@ -158,6 +158,14 @@ public class Connection implements ConnectionBase {
         mState = ConnectionState.Disconnected;
     }
 
+    public Class getTransportClass() {
+        if(mTransport == null) {
+            return null;
+        }
+
+        return mTransport.getClass();
+    }
+
     @Override
     public Logger getLogger() {
         return mLogger;
