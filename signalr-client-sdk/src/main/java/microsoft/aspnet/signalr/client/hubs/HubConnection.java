@@ -177,6 +177,7 @@ public class HubConnection extends Connection {
                 log("Invoking callback with empty result: " + key, LogLevel.Verbose);
                 mCallbacks.get(key).run(result);
             } catch (Exception e) {
+                log(e.getMessage(), LogLevel.Critical);
             }
         }
 

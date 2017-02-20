@@ -531,7 +531,12 @@ public class Connection implements ConnectionBase {
             
             if (mHeartbeatMonitor != null) {
                 log("Stopping Heartbeat monitor", LogLevel.Verbose);
-                mHeartbeatMonitor.stop();
+                try {
+                    mHeartbeatMonitor.stop();
+                } catch (Throwable e) {
+                    log("Error stopping Heartbeat monitor. " +
+                            e.getMessage(), LogLevel.Critical.Verbose);
+                }
             }
 
             mHeartbeatMonitor = null;
