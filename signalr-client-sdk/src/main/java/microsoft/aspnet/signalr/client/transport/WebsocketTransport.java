@@ -56,7 +56,8 @@ public class WebsocketTransport extends HttpClientTransport {
     }
 
     @Override
-    public SignalRFuture<Void> start(ConnectionBase connection, ConnectionType connectionType, final DataResultCallback callback) {
+    public SignalRFuture<Void> start(ConnectionBase connection, ConnectionType connectionType, final
+    DataResultCallback callback) {
         final String connectionString = connectionType == ConnectionType.InitialConnection ? "connect" : "reconnect";
 
         final String transport = getName();
@@ -82,7 +83,13 @@ public class WebsocketTransport extends HttpClientTransport {
 
         URI uri;
         try {
-            uri = new URI(url);
+            if (url.contains("http://")) {
+                uri = new URI(url.replace("http://", "ws://"));
+            } else if (url.contains("https://")) {
+                uri = new URI(url.replace("https://", "wss://"));
+            } else {
+                uri = new URI(url);
+            }
         } catch (URISyntaxException e) {
             e.printStackTrace();
             mConnectionFuture.triggerError(e);
@@ -115,20 +122,20 @@ public class WebsocketTransport extends HttpClientTransport {
                 try {
                     String decodedString = Charsetfunctions.stringUtf8(frame.getPayloadData());
 
-                    if(decodedString.equals("]}")){
+                    if (decodedString.equals("]}")) {
                         return;
                     }
 
-                    if(decodedString.endsWith(":[") || null == mPrefix){
+                    if (decodedString.endsWith(":[") || null == mPrefix) {
                         mPrefix = decodedString;
                         return;
                     }
 
                     String simpleConcatenate = mPrefix + decodedString;
 
-                    if(isJSONValid(simpleConcatenate)){
+                    if (isJSONValid(simpleConcatenate)) {
                         onMessage(simpleConcatenate);
-                    }else{
+                    } else {
                         String extendedConcatenate = simpleConcatenate + "]}";
                         if (isJSONValid(extendedConcatenate)) {
                             onMessage(extendedConcatenate);
@@ -159,11 +166,11 @@ public class WebsocketTransport extends HttpClientTransport {
         return new UpdateableCancellableFuture<Void>(null);
     }
 
-    private boolean isJSONValid(String test){
+    private boolean isJSONValid(String test) {
         try {
             gson.fromJson(test, Object.class);
             return true;
-        } catch(com.google.gson.JsonSyntaxException ex) {
+        } catch (com.google.gson.JsonSyntaxException ex) {
             return false;
         }
     }
