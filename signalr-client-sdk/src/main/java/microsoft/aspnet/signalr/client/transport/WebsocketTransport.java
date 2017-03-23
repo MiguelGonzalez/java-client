@@ -54,7 +54,8 @@ public class WebsocketTransport extends HttpClientTransport {
     }
 
     @Override
-    public SignalRFuture<Void> start(ConnectionBase connection, ConnectionType connectionType, final DataResultCallback callback) {
+    public SignalRFuture<Void> start(ConnectionBase connection, ConnectionType connectionType, final
+    DataResultCallback callback) {
         final String connectionString = connectionType == ConnectionType.InitialConnection ? "connect" : "reconnect";
 
         final String transport = getName();
@@ -80,7 +81,13 @@ public class WebsocketTransport extends HttpClientTransport {
 
         URI uri;
         try {
-            uri = new URI(url);
+            if (url.contains("http://")) {
+                uri = new URI(url.replace("http://", "ws://"));
+            } else if (url.contains("https://")) {
+                uri = new URI(url.replace("https://", "wss://"));
+            } else {
+                uri = new URI(url);
+            }
         } catch (URISyntaxException e) {
             e.printStackTrace();
             mConnectionFuture.triggerError(e);
