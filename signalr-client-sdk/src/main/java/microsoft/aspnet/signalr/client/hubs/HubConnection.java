@@ -149,10 +149,12 @@ public class HubConnection extends Connection {
     public String getConnectionData() {
         JsonArray jsonArray = new JsonArray();
 
-        for (String hubName : mHubs.keySet()) {
-            JsonObject element = new JsonObject();
-            element.addProperty("name", hubName);
-            jsonArray.add(element);
+        synchronized (this.mHubs) {
+            for (String hubName : mHubs.keySet()) {
+                JsonObject element = new JsonObject();
+                element.addProperty("name", hubName);
+                jsonArray.add(element);
+            }
         }
 
         String connectionData = jsonArray.toString();
@@ -172,16 +174,22 @@ public class HubConnection extends Connection {
         HubResult result = new HubResult();
         result.setError(error);
 
-        for (String key : mCallbacks.keySet()) {
-            try {
-                log("Invoking callback with empty result: " + key, LogLevel.Verbose);
-                mCallbacks.get(key).run(result);
-            } catch (Exception e) {
-                log(e.getMessage(), LogLevel.Critical);
+        synchronized (this.mCallbacks) {
+            for (String key : mCallbacks.keySet()) {
+                try {
+                    log("Invoking callback with empty result: " + key, LogLevel.Verbose);
+                    mCallbacks.get(key).run(result);
+                } catch (Exception e) {
+                    log("Error al limpiar los callbacks controlado: " + key, LogLevel.Critical);
+                    log(e.getMessage(), LogLevel.Critical);
+                } catch (Throwable t) {
+                    log("Throwable al limpiar los callbacks controlado: " + key, LogLevel.Critical);
+                    log(t.getMessage(), LogLevel.Critical);
+                }
             }
-        }
 
-        mCallbacks.clear();
+            mCallbacks.clear();
+        }
     }
 
     @Override
@@ -234,8 +242,12 @@ public class HubConnection extends Connection {
     String registerCallback(Action<HubResult> callback) {
         String id = mCallbackId.toString().toLowerCase(Locale.getDefault());
         log("Registering callback: " + id, LogLevel.Verbose);
-        mCallbacks.put(id, callback);
-        mCallbackId++;
+
+        synchronized (this.mCallbacks) {
+            mCallbacks.put(id, callback);
+            mCallbackId++;
+        }
+
         return id;
     }
 
@@ -247,7 +259,9 @@ public class HubConnection extends Connection {
      */
     void removeCallback(String callbackId) {
         log("Removing callback: " + callbackId, LogLevel.Verbose);
-        mCallbacks.remove(callbackId.toLowerCase(Locale.getDefault()));
+        synchronized (this.mCallbacks) {
+            mCallbacks.remove(callbackId.toLowerCase(Locale.getDefault()));
+        }
     }
 
     /**

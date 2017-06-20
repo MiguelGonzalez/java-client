@@ -27,8 +27,10 @@ public class Subscription {
      * @throws Exception
      */
     void onReceived(JsonElement[] data) throws Exception {
-        for (Action<JsonElement[]> handler : mReceived) {
-            handler.run(data);
+        synchronized (this.mReceived) {
+            for (Action<JsonElement[]> handler : mReceived) {
+                handler.run(data);
+            }
         }
     }
 
@@ -39,6 +41,8 @@ public class Subscription {
      *            Event handler
      */
     public void addReceivedHandler(Action<JsonElement[]> received) {
-        mReceived.add(received);
+        synchronized (this.mReceived) {
+            mReceived.add(received);
+        }
     }
 }

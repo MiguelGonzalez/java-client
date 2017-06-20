@@ -825,6 +825,14 @@ public class Connection implements ConnectionBase {
 
     protected void log(Throwable error) {
         mLogger.log(getSourceNameForLog() + " - Error: " + error.toString(), LogLevel.Critical);
+
+        StringBuilder sb = new StringBuilder();
+        for (StackTraceElement element : error.getStackTrace()) {
+            sb.append(element.toString());
+            sb.append("\n");
+        }
+
+        mLogger.log("Stack trace: " + sb.toString(), LogLevel.Critical);
     }
 
     protected String getSourceNameForLog() {
