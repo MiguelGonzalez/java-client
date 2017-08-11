@@ -80,12 +80,16 @@ public class LongPollingTransport extends HttpClientTransport {
             log("Start the communication with the server", LogLevel.Information);
             String url = connection.getUrl() + connectionUrl + TransportHelper.getReceiveQueryString(this, connection);
 
-            Request get = new Request(Constants.HTTP_GET);
+            final Request get = new Request(Constants.HTTP_GET);
 
             get.setUrl(url);
             get.setHeaders(connection.getHeaders());
 
             connection.prepareRequest(get);
+
+            if(RequestFilter != null) {
+                RequestFilter.exec(get);
+            }
 
             log("Execute the request", LogLevel.Verbose);
             mConnectionFuture = new UpdateableCancellableFuture<Void>(null);
@@ -96,7 +100,11 @@ public class LongPollingTransport extends HttpClientTransport {
                 public void onResponse(Response response) {
                     synchronized (mPollSync) {
                         try {
-                            throwOnInvalidStatusCode(response);
+                            throwOnInvalidStatusCode(get, response);
+
+                            if(ResponseFilter != null) {
+                                ResponseFilter.exec(get, response);
+                            }
 
                             if (connectionUrl != "poll") {
                                 mConnectionFuture.setResult(null);

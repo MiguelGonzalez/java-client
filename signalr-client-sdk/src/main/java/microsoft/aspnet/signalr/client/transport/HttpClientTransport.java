@@ -21,6 +21,9 @@ import microsoft.aspnet.signalr.client.http.HttpConnectionFuture.ResponseCallbac
 import microsoft.aspnet.signalr.client.http.InvalidHttpStatusCodeException;
 import microsoft.aspnet.signalr.client.http.Request;
 import microsoft.aspnet.signalr.client.http.Response;
+import microsoft.aspnet.signalr.client.transport.listener.ExceptionFilter;
+import microsoft.aspnet.signalr.client.transport.listener.ConnectionFilter;
+
 
 /**
  * ClientTransport base implementation over Http
@@ -31,6 +34,10 @@ public abstract class HttpClientTransport implements ClientTransport {
     protected HttpConnection mHttpConnection;
     protected boolean mStartedAbort = false;
     protected SignalRFuture<Void> mAbortFuture = null;
+
+    public ConnectionFilter RequestFilter;
+    public ConnectionFilter ResponseFilter;
+    public ExceptionFilter ExceptionFilter;
 
     private Logger mLogger;
 
@@ -59,11 +66,15 @@ public abstract class HttpClientTransport implements ClientTransport {
 
         String url = connection.getUrl() + "negotiate" + TransportHelper.getNegotiateQueryString(connection);
 
-        Request get = new Request(Constants.HTTP_GET);
+        final Request get = new Request(Constants.HTTP_GET);
         get.setUrl(url);
         get.setVerb(Constants.HTTP_GET);
 
         connection.prepareRequest(get);
+
+        if(RequestFilter != null) {
+            RequestFilter.exec(get);
+        }
 
         final SignalRFuture<NegotiationResponse> negotiationFuture = new SignalRFuture<NegotiationResponse>();
 
@@ -73,7 +84,7 @@ public abstract class HttpClientTransport implements ClientTransport {
             public void onResponse(Response response) {
                 try {
                     log("Response received", LogLevel.Verbose);
-                    throwOnInvalidStatusCode(response);
+                    throwOnInvalidStatusCode(get, response);
 
                     log("Read response data to the end", LogLevel.Verbose);
                     String negotiationContent = response.readToEnd();
@@ -81,6 +92,10 @@ public abstract class HttpClientTransport implements ClientTransport {
                     log("Trigger onSuccess with negotiation data: " + negotiationContent, LogLevel.Verbose);
                     negotiationFuture.setResult(new NegotiationResponse(negotiationContent, connection.getJsonParser()));
 
+
+                    if(ResponseFilter != null) {
+                        ResponseFilter.exec(get, response);
+                    }
                 } catch (Throwable e) {
                     log(e);
                     negotiationFuture.triggerError(new NegotiationException("There was a problem in the negotiation with the server", e));
@@ -97,8 +112,8 @@ public abstract class HttpClientTransport implements ClientTransport {
     public SignalRFuture<Void> send(ConnectionBase connection, String data, final DataResultCallback callback) {
         try {
             log("Start sending data to the server: " + data, LogLevel.Information);
+            final Request post = new Request(Constants.HTTP_POST);
 
-            Request post = new Request(Constants.HTTP_POST);
             post.setFormContent("data", data);
             post.setUrl(connection.getUrl() + "send" + TransportHelper.getSendQueryString(this, connection));
             post.setHeaders(connection.getHeaders());
@@ -106,13 +121,17 @@ public abstract class HttpClientTransport implements ClientTransport {
 
             connection.prepareRequest(post);
 
+            if(RequestFilter != null) {
+                RequestFilter.exec(post);
+            }
+
             log("Execute the request", LogLevel.Verbose);
             HttpConnectionFuture future = mHttpConnection.execute(post, new ResponseCallback() {
 
                 @Override
                 public void onResponse(Response response) throws Exception {
                     log("Response received", LogLevel.Verbose);
-                    throwOnInvalidStatusCode(response);
+                    throwOnInvalidStatusCode(post, response);
 
                     log("Read response to the end", LogLevel.Verbose);
                     String data = response.readToEnd();
@@ -120,6 +139,10 @@ public abstract class HttpClientTransport implements ClientTransport {
                     if (data != null) {
                         log("Trigger onData with data: " + data, LogLevel.Verbose);
                         callback.onData(data);
+                    }
+
+                    if(ResponseFilter != null) {
+                        ResponseFilter.exec(post, response);
                     }
                 }
             });
@@ -144,12 +167,16 @@ public abstract class HttpClientTransport implements ClientTransport {
                 try {
                     String url = connection.getUrl() + "abort" + TransportHelper.getSendQueryString(this, connection);
 
-                    Request post = new Request(Constants.HTTP_POST);
+                    final Request post = new Request(Constants.HTTP_POST);
 
                     post.setUrl(url);
                     post.setHeaders(connection.getHeaders());
 
                     connection.prepareRequest(post);
+
+                    if(RequestFilter != null) {
+                        RequestFilter.exec(post);
+                    }
 
                     log("Execute request", LogLevel.Verbose);
                     mAbortFuture = mHttpConnection.execute(post, new ResponseCallback() {
@@ -158,6 +185,10 @@ public abstract class HttpClientTransport implements ClientTransport {
                         public void onResponse(Response response) {
                             log("Finishing abort", LogLevel.Verbose);
                             mStartedAbort = false;
+
+                            if(ResponseFilter != null) {
+                                ResponseFilter.exec(post, response);
+                            }
                         }
                     });
 
@@ -179,7 +210,7 @@ public abstract class HttpClientTransport implements ClientTransport {
         }
     }
 
-    protected void throwOnInvalidStatusCode(Response response) throws InvalidHttpStatusCodeException {
+    protected void throwOnInvalidStatusCode(Request post, Response response) throws InvalidHttpStatusCodeException {
         if (response.getStatus() < 200 || response.getStatus() > 299) {
             String responseContent;
 
@@ -203,7 +234,16 @@ public abstract class HttpClientTransport implements ClientTransport {
                 headersString.append("]; ");
             }
 
-            throw new InvalidHttpStatusCodeException(response.getStatus(), responseContent, headersString.toString());
+            InvalidHttpStatusCodeException invalidHttpStatusCodeException = new InvalidHttpStatusCodeException(
+                    response.getStatus(),
+                    responseContent,
+                    headersString.toString());
+
+            if(ExceptionFilter != null) {
+                ExceptionFilter.exec(post, response, invalidHttpStatusCodeException);
+            }
+
+            throw invalidHttpStatusCodeException;
         }
 
     }

@@ -65,13 +65,17 @@ public class ServerSentEventsTransport extends HttpClientTransport {
         String url = connection.getUrl() + (connectionType == ConnectionType.InitialConnection ? "connect" : "reconnect")
                 + TransportHelper.getReceiveQueryString(this, connection);
 
-        Request get = new Request(Constants.HTTP_GET);
+        final Request get = new Request(Constants.HTTP_GET);
 
         get.setUrl(url);
         get.setHeaders(connection.getHeaders());
         get.addHeader("Accept", "text/event-stream");
 
         connection.prepareRequest(get);
+
+        if(RequestFilter != null) {
+            RequestFilter.exec(get);
+        }
 
         log("Execute the request", LogLevel.Verbose);
         mConnectionFuture = mHttpConnection.execute(get, new ResponseCallback() {
@@ -80,7 +84,11 @@ public class ServerSentEventsTransport extends HttpClientTransport {
             public void onResponse(Response response) {
                 try {
                     log("Response received", LogLevel.Verbose);
-                    throwOnInvalidStatusCode(response);
+                    throwOnInvalidStatusCode(get, response);
+
+                    if(ResponseFilter != null) {
+                        ResponseFilter.exec(get, response);
+                    }
 
                     mConnectionFuture.setResult(null);
 
